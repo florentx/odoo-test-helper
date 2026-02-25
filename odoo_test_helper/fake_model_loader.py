@@ -167,17 +167,23 @@ class FakeModelLoader(object):
         for key in self._original_registry:
             ori = self._original_registry[key]
             model = self.env.registry[key]
-            if hasattr(model, "_BaseModel__base_classes"):  # As of 15.0
+            has_base_classes = hasattr(model, "_BaseModel__base_classes")
+            if has_base_classes:  # As of 15.0
                 model._BaseModel__base_classes = ori["base"]
             model.__bases__ = ori["base"]
             model._inherit_children = ori["_inherit_children"]
             model._inherits_children = ori["_inherits_children"]
-            # Apply same logic as in TransactionCase's `check_attrs`
-            changeables = vars(model)
-            for field in model._fields:
-                if not field.startswith("x_") and field in changeables:
-                    delattr(model, field)
-
+            if has_base_classes:  # Odoo 15+
+                # Apply same logic as in TransactionCase's `check_attrs`
+                changeables = vars(model)
+                for field in model._fields:
+                    if not field.startswith("x_") and field in changeables:
+                        delattr(model, field)
+            else:
+                for field in model._fields:
+                    if field not in ori["_fields"]:
+                        if hasattr(model, field):
+                            delattr(model, field)
             model._fields = ori["_fields"]
 
         # delete 1st models w/out children
